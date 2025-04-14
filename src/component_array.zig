@@ -1,5 +1,5 @@
 const std = @import("std");
-const types = @import("ecs_defenitions.zig");
+const types = @import("ecs_definitions.zig");
 
 pub const IComponentArray = struct {
     ptr: *anyopaque,
@@ -29,7 +29,14 @@ pub fn createComponentArray(comptime T: type) type {
             const indexToEntity = try allocator.alloc(u32, capacity);
             const entityToIndex = try allocator.alloc(u32, capacity);
 
-            return .{ .allocator = allocator, .arrayPtr = arrptr, .size = 0, .capacity = capacity, .indexToEntityID = indexToEntity, .entityIDToIndex = entityToIndex };
+            return .{
+                .allocator = allocator,
+                .arrayPtr = arrptr,
+                .size = 0,
+                .capacity = capacity,
+                .indexToEntityID = indexToEntity,
+                .entityIDToIndex = entityToIndex,
+            };
         }
 
         pub fn deinit(self: *@This()) void {

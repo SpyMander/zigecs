@@ -1,7 +1,7 @@
 const std = @import("std");
 const arrayList = std.ArrayList;
 const cmpArray = @import("component_array.zig");
-const types = @import("ecs_defenitions.zig");
+const types = @import("ecs_definitions.zig");
 const arenaAllocator = std.heap.ArenaAllocator;
 
 pub const ComponentManager = struct {

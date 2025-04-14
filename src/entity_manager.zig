@@ -1,5 +1,5 @@
 const std = @import("std");
-const types = @import("ecs_defenitions.zig");
+const types = @import("ecs_definitions.zig");
 
 pub const EntityManager = struct {
     // u32 is too much?

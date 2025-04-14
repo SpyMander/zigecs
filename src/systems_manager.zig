@@ -1,5 +1,5 @@
 const std = @import("std");
-const types = @import("ecs_defenitions.zig");
+const types = @import("ecs_definitions.zig");
 const arrayBitSet = std.bit_set.ArrayBitSet;
 
 // TODO: hashmap might be overkill, test and try out other ways.
