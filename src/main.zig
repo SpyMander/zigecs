@@ -1,12 +1,19 @@
 const std = @import("std");
-const component_manager = @import("component_manager.zig");
 const entity_manager = @import("entity_manager.zig");
-const systems_manager = @import("systems_manager.zig");
 const types = @import("ecs_definitions.zig");
-const healthComponent = @import("components/health.zig").health;
 const component_storage = @import("component_storage.zig").componentStorage;
+const healthComponent = @import("components/health.zig").health;
 const arAloc = std.heap.ArenaAllocator;
-const archetype = @import("archetype.zig").Archetype;
+const Archetype = @import("archetype.zig").Archetype;
+const ArchetypeManager = @import("archetype_manager.zig").ArchetypeManager;
+
+// 1) not repeating archetypes via comparison of typenames
+// on creation of archetype, get the typenames array and store it
+// and assosiate it with the archetype object/ptr.
+
+// 2) archetype manager.getSlice will give slices gained from all of the
+// arhcetypes. [][]T. i think it should be.
+// maybe use an iterator?
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -19,36 +26,56 @@ pub fn main() !void {
 
     var entityManager = entity_manager.createEntityManager();
 
-    const components = [_]type{ healthComponent, u32 };
+    var x = Archetype(
+        &[_]type{ healthComponent, u32, f32 },
+    ).init(allocator);
 
-    var x = archetype.init(
-        allocator,
-        &components,
-    );
-
-    // test entity "0"
+    defer x.deinit();
 
     // i like this way.
     x.insertAtOnce(
         entityManager.createEntity(),
         .{
-            healthComponent{ .max = 100, .current = 30 },
-            @as(u32, 8),
+            healthComponent{ .max = 10, .current = 20 },
+            @as(u32, 2),
+            @as(f32, 3),
         },
     );
 
     x.insertAtOnce(
         entityManager.createEntity(),
         .{
-            healthComponent{ .max = 50, .current = 1 },
-            @as(u32, 100),
+            healthComponent{ .max = 20, .current = 30 },
+            @as(u32, 2),
+            @as(f32, 3),
         },
     );
 
-    for (x.getSlice(healthComponent), x.getSlice(u32)) |component, number| {
-        std.debug.print("health: {any} ", .{component});
-        std.debug.print("num: {}\n", .{number});
+    const ptr: *anyopaque = @ptrCast(&x);
+    const callback: *const fn (selfptr: *anyopaque, entity: types.entityID, componentLiterals: anytype) void = Archetype(
+        &[_]type{ healthComponent, u32, f32 },
+    ).insertAtOnceHandler;
+
+    callback(
+        ptr,
+        entityManager.createEntity(),
+        .{
+            healthComponent{ .max = 999, .current = 300 },
+            @as(u32, 2),
+            @as(f32, 3),
+        },
+    );
+
+    for (x.getSlice(healthComponent)) |health| {
+        std.debug.print("health: {}\n", .{health.max});
     }
 
-    defer x.deinit();
+    //var y = ArchetypeManager.init(allocator);
+    //defer y.deinit();
+
+    //y.addArchetype(&[_]type{ healthComponent, u32 });
+    //for (y.archetypeEntries.items) |entry| {
+    //std.debug.print("entrydata: {any}\n", .{entry.componentStorageEntries});
+    //}
+    std.debug.print("ending!\n", .{});
 }
