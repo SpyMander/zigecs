@@ -24,9 +24,9 @@ pub fn Archetype(comptime componentTypes: []const type) type {
             var storageEntries = arena.allocator().alloc(ComponentStorageEntry, componentTypes.len) catch unreachable;
 
             inline for (componentTypes, 0..) |T, i| {
-                var storagePtr = arena.allocator().alloc(ComponentStorage(T), 1) catch unreachable;
+                const storagePtr = arena.allocator().create(ComponentStorage(T)) catch unreachable;
 
-                storagePtr[0] = ComponentStorage(T).init();
+                storagePtr.* = ComponentStorage(T).init();
 
                 const anyopaqueStoragePtr: *anyopaque = @ptrCast(storagePtr);
                 storageEntries[i] = .{
@@ -84,7 +84,7 @@ pub fn Archetype(comptime componentTypes: []const type) type {
             return false;
         }
 
-        fn verifyComponentInputs(self: *@This(), comptime componentLiterals: anytype) bool {
+        fn verifyComponentInputs(self: *@This(), componentLiterals: anytype) bool {
             inline for (componentLiterals, 0..) |literal, index| {
                 const inputTypeName = types.getCharPtrName(@TypeOf(literal));
                 const typeName = self.componentStorageEntries[index].typeName;
@@ -118,7 +118,6 @@ pub fn Archetype(comptime componentTypes: []const type) type {
 
         // this must be in order as the types passed durring initalization.
         // multithreadable?
-        // also removed the comptime since it got problems
         pub fn insertAtOnce(self: *@This(), entity: types.entityID, componentLiterals: anytype) void {
             std.debug.assert(componentLiterals.len == self.componentStorageEntries.len);
             std.debug.assert(self.verifyComponentInputs(componentLiterals));
@@ -170,13 +169,5 @@ pub fn Archetype(comptime componentTypes: []const type) type {
 
             return storage.getSlice();
         }
-
-        pub fn insertAtOnceHandler(selfptr: *anyopaque, entity: types.entityID, componentLiterals: anytype) void {
-            var self: *@This() = @ptrCast(@alignCast(selfptr));
-
-            self.insertAtOnce(entity, componentLiterals);
-        }
-
-        //pub fn getInsertAtOnceCallback()
     };
 }

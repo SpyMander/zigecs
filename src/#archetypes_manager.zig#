@@ -1,4 +1,0 @@
-const std = @import("std");
-const types = @import("ecs_definitions.zig");
-
-const ArchetypesManager

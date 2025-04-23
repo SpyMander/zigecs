@@ -13,6 +13,7 @@ pub fn componentStorage(comptime T: type) type {
             };
         }
 
+        // remove this function.
         pub fn deinit(self: *@This()) void {
             _ = self;
         }
@@ -22,7 +23,6 @@ pub fn componentStorage(comptime T: type) type {
             return self.components[0..self.size];
         }
 
-        //returns index where it placed it
         // allways inserts at size
         pub fn insert(self: *@This(), component: T) void {
             std.debug.assert(self.size < types.maxEntities);

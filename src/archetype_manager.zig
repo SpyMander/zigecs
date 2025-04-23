@@ -2,6 +2,7 @@ const std = @import("std");
 const types = @import("ecs_definitions.zig");
 const Archetype = @import("archetype.zig").Archetype;
 const ComponentStorageEntry = @import("archetype.zig").ComponentStorageEntry;
+const ComponentStorage = @import("component_storage.zig").componentStorage;
 const HashMap = std.AutoArrayHashMap;
 const ArrayList = std.ArrayList;
 
@@ -49,19 +50,18 @@ pub const ArchetypeManager = struct {
         }) catch unreachable;
     }
 
-    fn getArchetype(self: *@This(), comptime componentTypes: []const type) ?*Archetype(componentTypes) {
-        const archetypeType: type = Archetype(componentTypes);
-
+    fn getArchetypePtr(self: *@This(), componentTypeNames: []*const c_char) ?*anyopaque {
         for (self.archetypeEntries.items) |archetypeEntry| {
-            if (archetypeEntry.componentStorageEntries.len != componentTypes.len) {
+            if (archetypeEntry.componentStorageEntries.len != componentTypeNames.len) {
                 continue;
             }
             const storageEntries = archetypeEntry.componentStorageEntries;
 
-            inline for (componentTypes, 0..) |T, index| {
-                if (storageEntries[index].typeName == types.getCharPtrName(T)) {
-                    if (index + 1 == componentTypes.len) {
-                        const archetype: *archetypeType = @ptrCast(@alignCast(archetypeEntry.ptr));
+            for (componentTypeNames, 0..) |typename, index| {
+                if (storageEntries[index].typeName == typename) {
+                    // test this loop
+                    if (index + 1 == componentTypeNames.len) {
+                        const archetype = archetypeEntry.ptr;
 
                         return archetype;
                     }
@@ -74,17 +74,42 @@ pub const ArchetypeManager = struct {
         return null;
     }
 
-    fn getTypesFromAnytype(comptime tuple: anytype) []const type {
-        return blk: {
-            break :blk &[_]type{
-                inline for (tuple) |item| @TypeOf(item),
-            };
-        };
+    // TODO: check if anytype is a tuple
+    fn getTypesFromAnytypeLiterals(comptime tuple: anytype) []const type {
+        comptime var typesAccumulator: [tuple.len]type = undefined;
+        inline for (tuple, 0..) |literal, index| {
+            typesAccumulator[index] = @TypeOf(literal);
+        }
+        // a copy happens here.
+        const typesConst = typesAccumulator;
+        return &typesConst;
     }
 
-    // shitty language wont let me extract the types from the tuple
-    // so u gon have to pass it yourself. >:(
-    //pub fn insert(self: *@This(), entity: types.entityID, comptime componentLiterals: anytype) void {
+    pub fn insert(self: *@This(), entity: types.entityID, comptime componentLiterals: anytype) void {
+        const componentTypes: []const type = getTypesFromAnytypeLiterals(componentLiterals);
+        const archetypeType: type = Archetype(componentTypes);
+        var typenames: [componentLiterals.len]*const c_char = undefined;
+        inline for (componentLiterals, 0..) |literal, index| {
+            typenames[index] = types.getCharPtrName(@TypeOf(literal));
+        }
 
+        const archetypePtr = self.getArchetypePtr(&typenames) orelse unreachable;
+        var archetype: *archetypeType = @ptrCast(@alignCast(archetypePtr));
+        archetype.insertAtOnce(entity, componentLiterals);
+    }
+
+    // turn this into an iterator?
+    // TODO: use a hashmap to keep track of the storages; K: typename
+    // V: arrayList *anyopaque;
+    //pub fn getComponentStorages(self: @This(), comptime componentType: T) [][]T {
+    // const typename = types.getCharPtrName(T);
+    //var storagePointers: *ComponentStorage(T);
+    //var
+    //for (self.archetypeEntries.items) | entry | {
+    //for (entry.componentStorageEntries) | entryTypename | {
+    //if ()
+    //}
+    //}
+    //   _ = self;
     //}
 };
