@@ -75,7 +75,7 @@ pub const ArchetypeManager = struct {
     }
 
     // TODO: check if anytype is a tuple
-    fn getTypesFromAnytypeLiterals(comptime tuple: anytype) []const type {
+    fn getTypesFromAnytypeLiterals(tuple: anytype) []const type {
         comptime var typesAccumulator: [tuple.len]type = undefined;
         inline for (tuple, 0..) |literal, index| {
             typesAccumulator[index] = @TypeOf(literal);
@@ -85,7 +85,9 @@ pub const ArchetypeManager = struct {
         return &typesConst;
     }
 
-    pub fn insert(self: *@This(), entity: types.entityID, comptime componentLiterals: anytype) void {
+    // this guy finds the archetype himself.
+    // todo: think if it should create the archetype if it doesn't exist;
+    pub fn autoInsert(self: *@This(), entity: types.entityID, componentLiterals: anytype) void {
         const componentTypes: []const type = getTypesFromAnytypeLiterals(componentLiterals);
         const archetypeType: type = Archetype(componentTypes);
         var typenames: [componentLiterals.len]*const c_char = undefined;
@@ -93,8 +95,37 @@ pub const ArchetypeManager = struct {
             typenames[index] = types.getCharPtrName(@TypeOf(literal));
         }
 
-        const archetypePtr = self.getArchetypePtr(&typenames) orelse unreachable;
+        const archetypePtr = self.getArchetypePtr(&typenames) orelse {
+            std.debug.print("!this archetype doesn't exist!\n", .{});
+            unreachable;
+        };
+
         var archetype: *archetypeType = @ptrCast(@alignCast(archetypePtr));
+        archetype.insertAtOnce(entity, componentLiterals);
+    }
+
+    pub fn insert(
+        self: *@This(),
+        entity: types.entityID,
+        comptime componentTypes: []const type,
+        componentLiterals: anytype,
+    ) void {
+        std.debug.assert(componentTypes.len == componentLiterals.len);
+
+        var typenames: [componentTypes.len]*const c_char = undefined;
+        inline for (componentTypes, 0..) |T, index| {
+            typenames[index] = types.getCharPtrName(T);
+        }
+
+        const archetypeType: type = Archetype(componentTypes);
+
+        const archetypePtr: *anyopaque = self.getArchetypePtr(&typenames) orelse {
+            std.debug.print("FATAL: this archetype doesn't exist in the archetype manager!\n", .{});
+            unreachable;
+        };
+
+        var archetype: *archetypeType = @ptrCast(@alignCast(archetypePtr));
+
         archetype.insertAtOnce(entity, componentLiterals);
     }
 

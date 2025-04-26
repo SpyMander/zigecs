@@ -27,58 +27,40 @@ pub fn main() !void {
 
     var entityManager = entity_manager.createEntityManager();
 
-    var x = Archetype(
-        &[_]type{ healthComponent, u32, f32 },
-    ).init(allocator);
-
-    defer x.deinit();
-
-    // i like this way.
-    x.insertAtOnce(
-        entityManager.createEntity(),
-        .{
-            healthComponent{ .max = 10, .current = 20 },
-            @as(u32, 2),
-            @as(f32, 3),
-        },
-    );
-
-    var value = @as(f32, 4);
-    value += 5;
-    x.insertAtOnce(
-        entityManager.createEntity(),
-        .{
-            healthComponent{ .max = 70, .current = 30 },
-            @as(u32, 2),
-            @as(f32, value),
-        },
-    );
-
-    x.insertAtOnce(entityManager.createEntity(), 2);
-
-    //const ptr: *anyopaque = @ptrCast(&x);
-
-    //comptime var componentTypes: [3]type = undefined;
-    //componentTypes[0] = healthComponent;
-    //componentTypes[1] = u32;
-    //componentTypes[2] = f32;
-
-    // copies to make it const?
-    //const componentTypesConst = componentTypes;
-
-    //const archetypeType: type = Archetype(componentTypesConst[0..]);
-    //const y: *archetypeType = @ptrCast(@alignCast(ptr));
-    //_ = y;
-
-    for (x.getSlice(healthComponent)) |health| {
-        std.debug.print("health: {}\n", .{health.max});
-    }
-
     var y = ArchetypeManager.init(allocator);
     defer y.deinit();
 
-    y.addArchetype(&[_]type{ healthComponent, u32 });
-    y.insert(2, .{ healthComponent{ .max = 999, .current = 99 }, @as(u32, 5) });
+    const rando: []const type = &[_]type{ healthComponent, u32 };
+    const rando2: []const type = &[_]type{ healthComponent, f32 };
+
+    y.addArchetype(rando);
+    y.addArchetype(rando2);
+
+    y.autoInsert(
+        entityManager.createEntity(),
+        .{
+            healthComponent{ .max = 999, .current = 99 },
+            @as(u32, 5),
+        },
+    );
+
+    y.insert(
+        entityManager.createEntity(),
+        rando,
+        .{
+            healthComponent{ .max = 123, .current = 321 },
+            @as(u32, 456),
+        },
+    );
+
+    y.insert(
+        entityManager.createEntity(),
+        rando2,
+        .{
+            healthComponent{ .max = 987, .current = 765 },
+            @as(f32, 12.5),
+        },
+    );
 
     std.debug.print("ending!\n", .{});
 }
