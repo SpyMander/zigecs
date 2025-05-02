@@ -158,6 +158,7 @@ pub fn Archetype(comptime componentTypes: []const type) type {
 
         // shouldn't have error handling, the idea is that this guy
         // should never fail.
+        // TODO: this guy is kinda useless? might be removed?
         pub fn getSlice(self: *@This(), comptime T: type) []T {
             const storageType: type = ComponentStorage(T);
             var storage: *storageType = undefined;

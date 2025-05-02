@@ -10,20 +10,27 @@ const ArrayList = std.ArrayList;
 // comptime structure. it would be more optimized.
 
 const ArchetypeEntry = struct {
+    // TODO: is keeping the storage entries important?
     componentStorageEntries: []ComponentStorageEntry,
+    entityToIndex: *[types.maxEntities]u32,
+    indexToEntity: *[types.maxEntities]types.entityID,
     ptr: *anyopaque,
 };
 
 pub const ArchetypeManager = struct {
     archetypeEntries: ArrayList(ArchetypeEntry),
+    // could use the storage entries for retrival, but this is faster.
+    typenameToStorages: HashMap(*const c_char, ArrayList(*anyopaque)),
     arena: std.heap.ArenaAllocator,
 
     pub fn init(allocator: std.mem.Allocator) @This() {
         const arena = std.heap.ArenaAllocator.init(allocator);
         const archetypeEntries = ArrayList(ArchetypeEntry).init(allocator);
+        const typenameToStorages = HashMap(*const c_char, ArrayList(*anyopaque)).init(allocator);
 
         return .{
             .archetypeEntries = archetypeEntries,
+            .typenameToStorages = typenameToStorages,
             .arena = arena,
         };
     }
@@ -32,22 +39,52 @@ pub const ArchetypeManager = struct {
         // for some reason, not calling the deinit of the
         // archetypes is fine.
         // TODO: that might be a problem. callbacks of fn deinit?
+
+        for (self.typenameToStorages.values()) |list|
+            list.deinit();
+        self.typenameToStorages.deinit();
+
         self.archetypeEntries.deinit();
         self.arena.deinit();
     }
 
     pub fn addArchetype(self: *@This(), comptime componentTypes: []const type) void {
         const allocator = self.arena.allocator();
-        const archetype = allocator.alloc(Archetype(componentTypes), 1) catch unreachable;
+        const archetype = allocator.create(Archetype(componentTypes)) catch unreachable;
 
-        archetype[0] = Archetype(componentTypes).init(allocator);
+        archetype.* = Archetype(componentTypes).init(allocator);
 
-        const storageEntries = archetype[0].componentStorageEntries;
+        const storageEntries = archetype.componentStorageEntries;
+        const entityToIndex = &archetype.entityToIndex;
+        const indexToEntity = &archetype.indexToEntity;
 
         self.archetypeEntries.append(.{
             .componentStorageEntries = storageEntries,
-            .ptr = archetype.ptr,
+            .entityToIndex = entityToIndex,
+            .indexToEntity = indexToEntity,
+            .ptr = @ptrCast(archetype),
         }) catch unreachable;
+
+        // TODO: This guy handles the relation between types and
+        // the storages for them, keeps track of the pointers,
+        // it works but looks like shit. put this in a different
+        // function
+
+        inline for (componentTypes, 0..) |T, index| {
+            const typename: *const c_char = types.getCharPtrName(T);
+
+            if (self.typenameToStorages.getPtr(typename)) |storageArr| {
+                storageArr.append(@ptrCast(storageEntries[index].ptr)) catch unreachable;
+            } else {
+                self.typenameToStorages.put(typename, ArrayList(*anyopaque).init(allocator)) catch unreachable;
+
+                if (self.typenameToStorages.getPtr(typename)) |storageArr| {
+                    storageArr.append(@ptrCast(storageEntries[index].ptr)) catch unreachable;
+                } else {
+                    std.debug.print("shit\n", .{});
+                }
+            }
+        }
     }
 
     fn getArchetypePtr(self: *@This(), componentTypeNames: []*const c_char) ?*anyopaque {
@@ -129,18 +166,162 @@ pub const ArchetypeManager = struct {
         archetype.insertAtOnce(entity, componentLiterals);
     }
 
-    // turn this into an iterator?
-    // TODO: use a hashmap to keep track of the storages; K: typename
-    // V: arrayList *anyopaque;
-    //pub fn getComponentStorages(self: @This(), comptime componentType: T) [][]T {
-    // const typename = types.getCharPtrName(T);
-    //var storagePointers: *ComponentStorage(T);
-    //var
-    //for (self.archetypeEntries.items) | entry | {
-    //for (entry.componentStorageEntries) | entryTypename | {
-    //if ()
-    //}
-    //}
-    //   _ = self;
-    //}
+    // my magnum opus, the culmination
+    pub fn getComponentIterator(
+        self: @This(),
+        comptime componentTypes: []const type,
+    ) ComponentIterator(componentTypes) {
+        return ComponentIterator(componentTypes).init(self);
+    }
+
+    pub fn getComponentStorages(
+        self: @This(),
+        comptime componentType: type,
+    ) [][]componentType {
+        const componentSlices: [][]componentType = undefined;
+
+        const typename: *const c_char = types.getCharPtrName(componentType);
+
+        std.debug.print("acessing: {}!\n", .{typename});
+
+        if (self.typenameToStorages.getPtr(typename)) |sptr| {
+            for (sptr.items) |storageptr| {
+                const storage: *ComponentStorage(componentType) = @ptrCast(@alignCast(storageptr));
+                std.debug.print("size: {}\n", .{storage.size});
+                //std.debug.print("ent: {}\n", .{archetypeEntry});
+            }
+        } else {
+            std.debug.print("that shit doesn't even exist!\n", .{});
+        }
+
+        return componentSlices;
+    }
 };
+
+pub fn ComponentIterator(comptime componentTypes: []const type) type {
+    return struct {
+        archetypeEntriesPtr: []ArchetypeEntry,
+        componentEntryIndex: usize,
+        currentStorages: [componentTypes.len]*anyopaque,
+        storageComponentIndex: usize,
+        reachedStorageEnd: bool, // TODO: better name??
+
+        pub fn init(archetypeManager: ArchetypeManager) @This() {
+            return .{
+                .archetypeEntriesPtr = archetypeManager.archetypeEntries.items,
+                .componentEntryIndex = 0,
+                .currentStorages = undefined,
+                .storageComponentIndex = 0,
+                .reachedStorageEnd = true,
+            };
+        }
+
+        // we cant really return the types, so we
+        // return ptr's that are match the
+        // componentTypesarray.
+        fn getMatchingComponentStorages(
+            archetypeEntry: ArchetypeEntry,
+        ) ?[componentTypes.len]*anyopaque {
+            var storages: [componentTypes.len]*anyopaque = undefined;
+
+            // if the type was found, the matching index
+            // will be turned to true.
+            var matchedTypes: [componentTypes.len]bool = undefined;
+            @memset(&matchedTypes, false);
+
+            var foundMatchingTypes: usize = 0;
+
+            for (archetypeEntry.componentStorageEntries) |entry| {
+                inline for (componentTypes, 0..) |T, typeIndex| {
+                    // would do an early continue, but that is a control
+                    // flow error, :(
+                    if (entry.typeName == types.getCharPtrName(T)) {
+                        // TODO: repeating, should it even be checked for?
+                        if (!matchedTypes[typeIndex]) {
+                            storages[typeIndex] = entry.ptr;
+                            foundMatchingTypes += 1;
+                            matchedTypes[typeIndex] = true;
+                        }
+                    }
+                }
+            }
+
+            std.debug.assert(foundMatchingTypes <= componentTypes.len); // how?
+
+            if (foundMatchingTypes < componentTypes.len) {
+                return null;
+            }
+
+            return storages;
+        }
+
+        // going through each archetype,
+        // checking if it has the necessary types
+        // if not check the next archetype.
+        pub fn next(self: *@This()) bool {
+            if (self.componentEntryIndex >= self.archetypeEntriesPtr.len)
+                return false;
+
+            if (!self.reachedStorageEnd) {
+                const storageType: type = ComponentStorage(componentTypes[0]);
+                const storage: *storageType = @ptrCast(@alignCast(self.currentStorages[0]));
+                const max = storage.size;
+
+                self.storageComponentIndex += 1;
+
+                if (self.storageComponentIndex >= max - 1)
+                    self.reachedStorageEnd = true;
+
+                return true;
+            }
+
+            while (true) {
+                if (getMatchingComponentStorages(self.archetypeEntriesPtr[self.componentEntryIndex])) |storages| {
+                    self.currentStorages = storages;
+                } else {
+                    return false;
+                }
+
+                const storageType: type = ComponentStorage(componentTypes[0]);
+                const storage: *storageType = @ptrCast(@alignCast(self.currentStorages[0]));
+                // skip ones that dont have any entities inside them.
+                if (storage.size != 0)
+                    break;
+            }
+
+            // reset the "head"
+            self.storageComponentIndex = 0;
+            self.reachedStorageEnd = false;
+            self.componentEntryIndex += 1;
+            return true;
+        }
+
+        // used for asserting
+        fn hasType(comptime T: type) bool {
+            inline for (componentTypes) |componentType| {
+                if (T == componentType) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        pub fn get(self: @This(), comptime T: type) *T {
+            std.debug.assert(hasType(T));
+            // i do not care if it's actually there or not
+            var component: *T = undefined;
+            inline for (componentTypes, 0..) |componentType, index| {
+                if (componentType == T) {
+                    const componentStorageType: type = ComponentStorage(T);
+                    const storage: *componentStorageType = @ptrCast(@alignCast(self.currentStorages[index]));
+                    // we dont care about going through the slice in this case
+                    // so we just straight up go to the array and grab the component
+                    component = &storage.components[self.storageComponentIndex];
+                }
+            }
+
+            return component;
+        }
+    };
+}
