@@ -7,14 +7,6 @@ const arAloc = std.heap.ArenaAllocator;
 const Archetype = @import("archetype.zig").Archetype;
 const ArchetypeManager = @import("archetype_manager.zig").ArchetypeManager;
 
-// 1) not repeating archetypes via comparison of typenames
-// on creation of archetype, get the typenames array and store it
-// and assosiate it with the archetype object/ptr.
-
-// 2) archetype manager.getSlice will give slices gained from all of the
-// arhcetypes. [][]T. i think it should be.
-// maybe use an iterator?
-
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
