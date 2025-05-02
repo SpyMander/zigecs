@@ -8,7 +8,7 @@ const types = @import("ecs_definitions.zig");
 pub fn ComponentIterator(comptime componentTypes: []const type) type {
     return struct {
         archetypeEntriesPtr: []ArchetypeEntry,
-        componentEntryIndex: usize,
+        archetypeEntryIndex: usize,
         currentStorages: [componentTypes.len]*anyopaque,
         storageComponentIndex: usize,
         reachedStorageEnd: bool, // TODO: better name??
@@ -16,7 +16,7 @@ pub fn ComponentIterator(comptime componentTypes: []const type) type {
         pub fn init(archetypeManager: ArchetypeManager) @This() {
             return .{
                 .archetypeEntriesPtr = archetypeManager.archetypeEntries.items,
-                .componentEntryIndex = 0,
+                .archetypeEntryIndex = 0,
                 .currentStorages = undefined,
                 .storageComponentIndex = 0,
                 .reachedStorageEnd = true,
@@ -66,9 +66,6 @@ pub fn ComponentIterator(comptime componentTypes: []const type) type {
         // checking if it has the necessary types
         // if not check the next archetype.
         pub fn next(self: *@This()) bool {
-            if (self.componentEntryIndex >= self.archetypeEntriesPtr.len)
-                return false;
-
             if (!self.reachedStorageEnd) {
                 const storageType: type = ComponentStorage(componentTypes[0]);
                 const storage: *storageType = @ptrCast(@alignCast(self.currentStorages[0]));
@@ -76,14 +73,18 @@ pub fn ComponentIterator(comptime componentTypes: []const type) type {
 
                 self.storageComponentIndex += 1;
 
-                if (self.storageComponentIndex >= max - 1)
+                if (self.storageComponentIndex >= max - 1) {
                     self.reachedStorageEnd = true;
+                }
 
                 return true;
             }
 
+            if (self.archetypeEntryIndex >= self.archetypeEntriesPtr.len)
+                return false;
+
             while (true) {
-                if (getMatchingComponentStorages(self.archetypeEntriesPtr[self.componentEntryIndex])) |storages| {
+                if (getMatchingComponentStorages(self.archetypeEntriesPtr[self.archetypeEntryIndex])) |storages| {
                     self.currentStorages = storages;
                 } else {
                     return false;
@@ -99,7 +100,7 @@ pub fn ComponentIterator(comptime componentTypes: []const type) type {
             // reset the "head"
             self.storageComponentIndex = 0;
             self.reachedStorageEnd = false;
-            self.componentEntryIndex += 1;
+            self.archetypeEntryIndex += 1;
             return true;
         }
 
@@ -129,6 +130,13 @@ pub fn ComponentIterator(comptime componentTypes: []const type) type {
             }
 
             return component;
+        }
+
+        pub fn getEntity(self: @This()) types.entityID {
+            // no idea.
+            const entry = self.archetypeEntriesPtr[self.archetypeEntryIndex - 1];
+
+            return entry.indexToEntity[self.storageComponentIndex];
         }
     };
 }

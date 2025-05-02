@@ -54,12 +54,20 @@ pub fn main() !void {
         },
     );
 
-    var iter = y.getComponentIterator(&[_]type{ healthComponent, u32 });
+    y.insert(
+        entityManager.createEntity(),
+        rando2,
+        .{
+            healthComponent{ .max = 532, .current = 531 },
+            @as(f32, 62.5),
+        },
+    );
+
+    var iter = y.getComponentIterator(&[_]type{healthComponent});
     while (iter.next()) {
         const component = iter.get(healthComponent);
-        const component2 = iter.get(u32);
         std.debug.print("component info: max:{} | cur:{}\n", .{ component.max, component.current });
-        std.debug.print("component info2: val:{}\n", .{component2.*});
+        std.debug.print("ent: {}\n", .{iter.getEntity()});
     }
 
     std.debug.print("ending!\n", .{});
