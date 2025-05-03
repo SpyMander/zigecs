@@ -5,6 +5,13 @@ pub fn build(b: *std.Build) void {
 
     const optimize = b.standardOptimizeOption(.{});
 
+    // expose library
+    _ = b.addModule("zigecs", .{
+        .root_source_file = b.path("root.zig"),
+    });
+
+    // test stuff
+
     const lib_unit_tests = b.addTest(.{
         .root_source_file = b.path("src/test.zig"),
         .target = target,
