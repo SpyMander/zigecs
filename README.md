@@ -1,15 +1,15 @@
 
-* ZIGECS
+# ZIGECS
 an archetypal ecs for zig, smol and simple.
 
-* INSTALL
+## INSTALL
 ... in an already existing project:
 
 get the tarball-link through the releases.
 run: `zig zig fetch --save "https://github.com/SpyMander/zigecs/archive/refs/tags/[VERIOSN_TAG].tar.gz"`
 
 zig build config example:
-```
+``` zig
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
@@ -60,7 +60,7 @@ pub fn build(b: *std.Build) void {
 the important bit in the config is the max entity limit.
 be sure to add the options to the zigecs module
 
-* EXAMPLE
+## EXAMPLE
 ```
 const std = @import("std");
 const arhcetypeManager = @import("zigecs").ArchetypeManager;
@@ -104,7 +104,7 @@ pub fn main() !void {
 ```
 
 
-** Features to be added in the future:
+## Features to be added in the future:
 1. removing arhcetypes at runtime
 2. auto inserting creating an archetype automatically
 _and other stuff?_
