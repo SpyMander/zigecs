@@ -7,7 +7,7 @@ pub fn build(b: *std.Build) void {
 
     // expose library
     _ = b.addModule("zigecs", .{
-        .root_source_file = b.path("root.zig"),
+        .root_source_file = b.path("src/root.zig"),
     });
 
     // test stuff
