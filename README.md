@@ -61,7 +61,7 @@ the important bit in the config is the max entity limit.
 be sure to add the options to the zigecs module
 
 ## EXAMPLE
-```
+``` zig
 const std = @import("std");
 const arhcetypeManager = @import("zigecs").ArchetypeManager;
 
