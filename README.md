@@ -63,7 +63,7 @@ be sure to add the options to the zigecs module
 ## EXAMPLE
 ``` zig
 const std = @import("std");
-const arhcetypeManager = @import("zigecs").ArchetypeManager;
+const archetypeManager = @import("zigecs").ArchetypeManager;
 
 pub fn main() !void {
     const stdout_file = std.io.getStdOut().writer();
@@ -105,6 +105,6 @@ pub fn main() !void {
 
 
 ## Features to be added in the future:
-1. removing arhcetypes at runtime
+1. removing archetypeManager at runtime
 2. auto inserting creating an archetype automatically
 _and other stuff?_

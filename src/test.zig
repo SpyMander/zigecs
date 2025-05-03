@@ -73,3 +73,35 @@ test "generic test" {
     std.debug.print("ending!\n", .{});
     //try std.testing.expect(true);
 }
+
+test "one element test" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer {
+        _ = gpa.deinit();
+    }
+
+    var x = ArchetypeManager.init(gpa.allocator());
+    defer x.deinit();
+
+    const randoType = &[_]type{ u32, f32 };
+    x.addArchetype(randoType);
+
+    x.insert(
+        0,
+        randoType,
+        .{
+            @as(u32, 5),
+            @as(f32, 12.4),
+        },
+    );
+
+    var iterAmount: usize = 0;
+    var iter = x.getComponentIterator(&[_]type{u32});
+    while (iter.next()) {
+        iterAmount += 1;
+        const value = iter.get(u32);
+        _ = value;
+    }
+
+    try std.testing.expect(iterAmount == 1);
+}

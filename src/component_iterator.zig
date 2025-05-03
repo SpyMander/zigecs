@@ -101,6 +101,16 @@ pub fn ComponentIterator(comptime componentTypes: []const type) type {
             self.storageComponentIndex = 0;
             self.reachedStorageEnd = false;
             self.archetypeEntryIndex += 1;
+
+            // TODO: repeated code fix dat. 1 element edge case
+            const storageType: type = ComponentStorage(componentTypes[0]);
+            const storage: *storageType = @ptrCast(@alignCast(self.currentStorages[0]));
+            const max = storage.size;
+
+            if (self.storageComponentIndex >= max - 1) {
+                self.reachedStorageEnd = true;
+            }
+
             return true;
         }
 
