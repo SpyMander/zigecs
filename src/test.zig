@@ -94,6 +94,22 @@ test "one element test" {
             @as(f32, 12.4),
         },
     );
+    x.insert(
+        1,
+        randoType,
+        .{
+            @as(u32, 5),
+            @as(f32, 12.4),
+        },
+    );
+    x.insert(
+        2,
+        randoType,
+        .{
+            @as(u32, 5),
+            @as(f32, 12.4),
+        },
+    );
 
     var iterAmount: usize = 0;
     var iter = x.getComponentIterator(&[_]type{u32});
@@ -103,5 +119,123 @@ test "one element test" {
         _ = value;
     }
 
+    try std.testing.expect(iterAmount == 3);
+}
+
+test "components in components" {
+    std.debug.print("\n\n| COMPONENTS IN COMPONENTS TEST!!!|\n\n", .{});
+    const metaComponent = struct {
+        hp: healthComponent,
+        someBullshit: u32,
+    };
+
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+
+    defer {
+        const status = gpa.deinit();
+        std.debug.print("gpa deinit leak?: {}\n", .{status == .leak});
+    }
+
+    const allocator = gpa.allocator();
+
+    var entityManager = entity_manager.createEntityManager();
+    var y = ArchetypeManager.init(allocator);
+    defer y.deinit();
+
+    // adding an f32 to rando fixes is for some reason.
+    const rando: []const type = &[_]type{ metaComponent, u32 };
+    const rando2: []const type = &[_]type{ u32, healthComponent };
+
+    y.addArchetype(rando);
+    y.addArchetype(rando2);
+
+    y.insert( // 1
+        entityManager.createEntity(),
+        rando2,
+        .{
+            @as(u32, 9),
+            healthComponent{ .current = 7, .max = 8 },
+        },
+    );
+    y.insert( // 2
+        entityManager.createEntity(),
+        rando,
+        .{
+            metaComponent{
+                .hp = healthComponent{
+                    .current = 20,
+                    .max = 400,
+                },
+                .someBullshit = @as(u32, 500),
+            },
+            @as(u32, 9),
+        },
+    );
+
+    var iter = y.getComponentIterator(&[_]type{u32});
+
+    var iterAmount: usize = 0;
+    while (iter.next()) {
+        iterAmount += 1;
+        const component = iter.get(u32);
+        try std.testing.expect(component.* == 9);
+    }
+
+    std.debug.print("ending!\n", .{});
+    try std.testing.expect(iterAmount == 2);
+}
+
+test "iterator" {
+    std.debug.print("\n\n| COMPONENTS IN COMPONENTS TEST!!!|\n\n", .{});
+
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+
+    defer {
+        const status = gpa.deinit();
+        std.debug.print("gpa deinit leak?: {}\n", .{status == .leak});
+    }
+
+    const allocator = gpa.allocator();
+
+    var entityManager = entity_manager.createEntityManager();
+    var y = ArchetypeManager.init(allocator);
+    defer y.deinit();
+
+    // adding an f32 to rando fixes is for some reason.
+    const rando: []const type = &[_]type{u32};
+    const rando2: []const type = &[_]type{ healthComponent, f64 };
+
+    y.addArchetype(rando);
+    y.addArchetype(rando2);
+
+    y.insert( // 1
+        entityManager.createEntity(),
+        rando,
+        .{
+            @as(u32, 9),
+        },
+    );
+    y.insert( // 2
+        entityManager.createEntity(),
+        rando2,
+        .{
+            healthComponent{
+                .current = 20,
+                .max = 400,
+            },
+            @as(f64, 9),
+        },
+    );
+
+    var iter = y.getComponentIterator(&[_]type{healthComponent});
+
+    var iterAmount: usize = 0;
+    while (iter.next()) {
+        iterAmount += 1;
+        const component = iter.get(healthComponent);
+        try std.testing.expect(component.max == 400);
+    }
+
+    std.debug.print("iter amount: {}\n", .{iterAmount});
     try std.testing.expect(iterAmount == 1);
 }

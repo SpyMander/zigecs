@@ -19,11 +19,19 @@ pub fn Archetype(comptime componentTypes: []const type) type {
         indexToEntity: [types.maxEntities]types.entityID,
 
         pub fn init(allocator: std.mem.Allocator) @This() {
+            std.debug.print("Initalizing Archetype with types:\n", .{});
+            inline for (componentTypes) |T| {
+                std.debug.print("{s}\n", .{@typeName(T)});
+            }
+            std.debug.print("\n", .{});
+
             var arena = std.heap.ArenaAllocator.init(allocator);
 
             var storageEntries = arena.allocator().alloc(ComponentStorageEntry, componentTypes.len) catch unreachable;
 
+            std.debug.print("Initalizing Archetype storages\n", .{});
             inline for (componentTypes, 0..) |T, i| {
+                std.debug.print("{s}\n", .{@typeName(T)});
                 const storagePtr = arena.allocator().create(ComponentStorage(T)) catch unreachable;
 
                 storagePtr.* = ComponentStorage(T).init();
@@ -85,8 +93,23 @@ pub fn Archetype(comptime componentTypes: []const type) type {
         }
 
         fn verifyComponentInputs(self: *@This(), componentLiterals: anytype) bool {
+            std.debug.print("\n", .{});
+            std.debug.print("Archetype: fn verifyComponents:\n", .{});
+            std.debug.print("i have types:\n", .{});
+            inline for (componentTypes) |T| {
+                std.debug.print("{s}\n", .{@typeName(T)});
+            }
+
+            std.debug.print("\nstorage entries: \n", .{});
+            for (self.componentStorageEntries) |e| {
+                const sptr: [*:0]const u8 = @ptrCast(e.typeName);
+                std.debug.print("{s}\n", .{sptr});
+            }
+            std.debug.print("\n", .{});
+
             inline for (componentLiterals, 0..) |literal, index| {
                 const inputTypeName = types.getCharPtrName(@TypeOf(literal));
+                // component storage entries fucked?
                 const typeName = self.componentStorageEntries[index].typeName;
 
                 if (inputTypeName != typeName) {
@@ -119,6 +142,14 @@ pub fn Archetype(comptime componentTypes: []const type) type {
         // this must be in order as the types passed durring initalization.
         // multithreadable?
         pub fn insertAtOnce(self: *@This(), entity: types.entityID, componentLiterals: anytype) void {
+            std.debug.print("\n", .{});
+            std.debug.print("Archetype: fn insertAtOnce:\n", .{});
+            std.debug.print("i have types:\n", .{});
+            inline for (componentTypes) |T| {
+                std.debug.print("{s}\n", .{@typeName(T)});
+            }
+            std.debug.print("\n", .{});
+
             std.debug.assert(componentLiterals.len == self.componentStorageEntries.len);
             std.debug.assert(self.verifyComponentInputs(componentLiterals));
 
