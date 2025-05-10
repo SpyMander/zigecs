@@ -6,26 +6,24 @@ const types = @import("ecs_definitions.zig");
 
 // THIS IS FOR ARCHETYPES. couldn't figure out a good name and this works.
 pub fn ComponentIterator(comptime componentTypes: []const type) type {
+    std.debug.assert(componentTypes.len > 0); //at least put one type in
     return struct {
         archetypeEntriesPtr: []ArchetypeEntry,
-        archetypeEntryIndex: usize,
+        archetypeEntryIndex: i32,
+        storageComponentIndex: i32,
         currentStorages: [componentTypes.len]*anyopaque,
-        storageComponentIndex: usize,
-        reachedStorageEnd: bool, // TODO: better name??
 
         pub fn init(archetypeManager: ArchetypeManager) @This() {
             return .{
                 .archetypeEntriesPtr = archetypeManager.archetypeEntries.items,
-                .archetypeEntryIndex = 0,
+                .archetypeEntryIndex = -1,
+                .storageComponentIndex = -1,
                 .currentStorages = undefined,
-                .storageComponentIndex = 0,
-                .reachedStorageEnd = true,
             };
         }
 
-        // we cant really return the types, so we
-        // return ptr's that are match the
-        // componentTypes array.
+        // guy returns the storages. pointers.
+        // they should match up with the componentTypes array.
         fn getMatchingComponentStorages(
             archetypeEntry: ArchetypeEntry,
         ) ?[componentTypes.len]*anyopaque {
@@ -45,6 +43,8 @@ pub fn ComponentIterator(comptime componentTypes: []const type) type {
                     if (entry.typeName == types.getCharPtrName(T)) {
                         // TODO: repeating, should it even be checked for?
                         if (!matchedTypes[typeIndex]) {
+                            const Dname: [*:0]const u8 = @ptrCast(entry.typeName);
+                            std.debug.print("matched: {s}\n", .{Dname});
                             storages[typeIndex] = entry.ptr;
                             foundMatchingTypes += 1;
                             matchedTypes[typeIndex] = true;
@@ -53,7 +53,7 @@ pub fn ComponentIterator(comptime componentTypes: []const type) type {
                 }
             }
 
-            std.debug.assert(foundMatchingTypes <= componentTypes.len); // how?
+            std.debug.assert(foundMatchingTypes <= componentTypes.len); // not possible
 
             if (foundMatchingTypes < componentTypes.len) {
                 return null;
@@ -66,49 +66,47 @@ pub fn ComponentIterator(comptime componentTypes: []const type) type {
         // checking if it has the necessary types
         // if not check the next archetype.
         pub fn next(self: *@This()) bool {
-            if (!self.reachedStorageEnd) {
-                const storageType: type = ComponentStorage(componentTypes[0]);
-                const storage: *storageType = @ptrCast(@alignCast(self.currentStorages[0]));
-                const max = storage.size;
+            if (self.storageComponentIndex < 0) {
+                // this means that we should go to the next
+                // archetype now.
+                // find next archetype
+                while (true) {
+                    self.archetypeEntryIndex += 1;
 
-                self.storageComponentIndex += 1;
+                    if (self.archetypeEntryIndex >= self.archetypeEntriesPtr.len) {
+                        // only here should it return false;
+                        return false;
+                    }
 
-                if (self.storageComponentIndex >= max - 1) {
-                    self.reachedStorageEnd = true;
+                    const archetypeEntry =
+                        self.archetypeEntriesPtr[@intCast(self.archetypeEntryIndex)];
+
+                    // you could optimize by writing inside the
+                    // the currentStorages buffer directly but
+                    // i dont think you would gain much.
+                    if (getMatchingComponentStorages(archetypeEntry)) |storages| {
+                        const storageT: type = ComponentStorage(componentTypes[0]);
+                        const storage: *storageT = @ptrCast(@alignCast(storages[0]));
+                        std.debug.print("compIter: FOUND ARCH\n", .{});
+
+                        // if it's an archetype with no entities.
+                        if (storage.size == 0) continue;
+
+                        self.currentStorages = storages;
+                        break;
+                    }
                 }
-
-                return true;
             }
 
-            if (self.archetypeEntryIndex >= self.archetypeEntriesPtr.len)
-                return false;
+            self.storageComponentIndex += 1;
+            // getting len of the storage
+            const storageT: type = ComponentStorage(componentTypes[0]);
+            const storage: *storageT = @ptrCast(@alignCast(self.currentStorages[0]));
 
-            while (true) {
-                if (getMatchingComponentStorages(self.archetypeEntriesPtr[self.archetypeEntryIndex])) |storages| {
-                    self.currentStorages = storages;
-                } else {
-                    return false;
-                }
-
-                const storageType: type = ComponentStorage(componentTypes[0]);
-                const storage: *storageType = @ptrCast(@alignCast(self.currentStorages[0]));
-                // skip ones that dont have any entities inside them.
-                if (storage.size != 0)
-                    break;
-            }
-
-            // reset the "head"
-            self.storageComponentIndex = 0;
-            self.reachedStorageEnd = false;
-            self.archetypeEntryIndex += 1;
-
-            // TODO: repeated code fix dat. 1 element edge case
-            const storageType: type = ComponentStorage(componentTypes[0]);
-            const storage: *storageType = @ptrCast(@alignCast(self.currentStorages[0]));
-            const max = storage.size;
-
-            if (self.storageComponentIndex >= max - 1) {
-                self.reachedStorageEnd = true;
+            if (self.storageComponentIndex >= storage.size) {
+                self.storageComponentIndex = -1;
+                // recursive is fine here.
+                return self.next();
             }
 
             return true;
@@ -125,8 +123,9 @@ pub fn ComponentIterator(comptime componentTypes: []const type) type {
             return false;
         }
 
-        pub fn get(self: @This(), comptime T: type) *T {
-            std.debug.assert(hasType(T));
+        pub fn getComponent(self: @This(), comptime T: type) *T {
+            std.debug.assert(hasType(T)); // this type doesn't exist in the iterator
+
             // i do not care if it's actually there or not
             var component: *T = undefined;
             inline for (componentTypes, 0..) |componentType, index| {
@@ -135,7 +134,7 @@ pub fn ComponentIterator(comptime componentTypes: []const type) type {
                     const storage: *componentStorageType = @ptrCast(@alignCast(self.currentStorages[index]));
                     // we dont care about going through the slice in this case
                     // so we just straight up go to the array and grab the component
-                    component = &storage.components[self.storageComponentIndex];
+                    component = &storage.components[@intCast(self.storageComponentIndex)];
                 }
             }
 
@@ -144,9 +143,10 @@ pub fn ComponentIterator(comptime componentTypes: []const type) type {
 
         pub fn getEntity(self: @This()) types.entityID {
             // no idea.
-            const entry = self.archetypeEntriesPtr[self.archetypeEntryIndex - 1];
+            // -1
+            const entry = self.archetypeEntriesPtr[@intCast(self.archetypeEntryIndex)];
 
-            return entry.indexToEntity[self.storageComponentIndex];
+            return entry.indexToEntity[@intCast(self.storageComponentIndex)];
         }
     };
 }

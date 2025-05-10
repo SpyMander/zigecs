@@ -65,7 +65,7 @@ test "generic test" {
 
     var iter = y.getComponentIterator(&[_]type{healthComponent});
     while (iter.next()) {
-        const component = iter.get(healthComponent);
+        const component = iter.getComponent(healthComponent);
         std.debug.print("component info: max:{} | cur:{}\n", .{ component.max, component.current });
         std.debug.print("ent: {}\n", .{iter.getEntity()});
     }
@@ -114,9 +114,14 @@ test "one element test" {
     var iterAmount: usize = 0;
     var iter = x.getComponentIterator(&[_]type{u32});
     while (iter.next()) {
+        const value = iter.getComponent(u32);
+
+        std.debug.print("val: {}", .{value.*});
+        std.debug.print(" ent: {}\n", .{iter.getEntity()});
+        try std.testing.expect(iterAmount == iter.getEntity());
+        try std.testing.expect(value.* == 5);
+
         iterAmount += 1;
-        const value = iter.get(u32);
-        _ = value;
     }
 
     try std.testing.expect(iterAmount == 3);
@@ -177,7 +182,7 @@ test "components in components" {
     var iterAmount: usize = 0;
     while (iter.next()) {
         iterAmount += 1;
-        const component = iter.get(u32);
+        const component = iter.getComponent(u32);
         try std.testing.expect(component.* == 9);
     }
 
@@ -232,8 +237,9 @@ test "iterator" {
     var iterAmount: usize = 0;
     while (iter.next()) {
         iterAmount += 1;
-        const component = iter.get(healthComponent);
+        const component = iter.getComponent(healthComponent);
         try std.testing.expect(component.max == 400);
+        try std.testing.expect(iter.getEntity() == iterAmount);
     }
 
     std.debug.print("iter amount: {}\n", .{iterAmount});
