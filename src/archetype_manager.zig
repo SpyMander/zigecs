@@ -61,17 +61,6 @@ pub const ArchetypeManager = struct {
     }
 
     fn getArchetypePtr(self: *@This(), componentTypeNames: []*const c_char) ?*anyopaque {
-        std.debug.print("\n", .{});
-        std.debug.print("ArchetypeManager: fn getArchetypePtr:\n", .{});
-        std.debug.print("trying to find the correct archetype that has\n", .{});
-
-        //test for
-        for (componentTypeNames) |name| {
-            const sptr: [*:0]const u8 = @ptrCast(name);
-            std.debug.print("{s}\n", .{sptr});
-        }
-
-        std.debug.print("\n", .{});
         for (self.archetypeEntries.items) |archetypeEntry| {
             if (archetypeEntry.componentStorageEntries.len != componentTypeNames.len) {
                 continue;
@@ -83,7 +72,6 @@ pub const ArchetypeManager = struct {
                 }
 
                 if (index + 1 == storageEntries.len) {
-                    std.debug.print("i found the archetype!\n", .{});
                     return archetypeEntry.ptr;
                 }
             }

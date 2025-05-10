@@ -43,8 +43,6 @@ pub fn ComponentIterator(comptime componentTypes: []const type) type {
                     if (entry.typeName == types.getCharPtrName(T)) {
                         // TODO: repeating, should it even be checked for?
                         if (!matchedTypes[typeIndex]) {
-                            const Dname: [*:0]const u8 = @ptrCast(entry.typeName);
-                            std.debug.print("matched: {s}\n", .{Dname});
                             storages[typeIndex] = entry.ptr;
                             foundMatchingTypes += 1;
                             matchedTypes[typeIndex] = true;
@@ -87,7 +85,6 @@ pub fn ComponentIterator(comptime componentTypes: []const type) type {
                     if (getMatchingComponentStorages(archetypeEntry)) |storages| {
                         const storageT: type = ComponentStorage(componentTypes[0]);
                         const storage: *storageT = @ptrCast(@alignCast(storages[0]));
-                        std.debug.print("compIter: FOUND ARCH\n", .{});
 
                         // if it's an archetype with no entities.
                         if (storage.size == 0) continue;
