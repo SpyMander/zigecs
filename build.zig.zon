@@ -1,10 +1,10 @@
 .{
-    .name = "ecs",
+    .name = .ziecs,
 
-    .version = "0.2.2",
-
+    .version = "0.2.3",
+    .minimum_zig_version = "0.14.1",
     .dependencies = .{},
-
+    .fingerprint = 0xfaaea6d3a0f13a23,
     .paths = .{
         "build.zig",
         "build.zig.zon",
